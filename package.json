@@ -1,0 +1,7 @@
+{
+  "name": "voicebot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A voice bot that answers interview questions as me."
+}
