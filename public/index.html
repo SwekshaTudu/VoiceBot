@@ -230,8 +230,18 @@
   let voice = null;
   function pickVoice() {
     const vs = speechSynthesis.getVoices().filter((v) => /^en([-_]|$)/i.test(v.lang));
-    const by = (re) => vs.find((v) => re.test(v.lang.replace("_", "-")));
-    voice = by(/^en-IN/i) || vs.find((v) => /Google UK English Male|Daniel/i.test(v.name)) || by(/^en-GB/i) || by(/^en-US/i) || vs[0] || null;
+    // Browsers don't say whether a voice is male or female, so go by the well-known voice names.
+    const FEMALE = /female|neerja|heera|veena|swara|samantha|karen|moira|tessa|fiona|victoria|allison|ava\b|susan|serena|kate|stephanie|zira|aria|jenny|michelle|sonia|libby|hazel|natasha|catherine|google us english/i;
+    const MALE = /\bmale\b|rishi|ravi|prabhat|hemant|daniel|david|mark\b|george|guy\b|ryan|alex\b|fred|aaron|arthur|gordon|oliver|thomas|james|tom\b|eddy|reed|rocko|grandpa|albert|ralph|junior|bruce/i;
+    const isF = (v) => FEMALE.test(v.name) && !/\bmale\b/i.test(v.name);
+    const lang = (v, re) => re.test(v.lang.replace("_", "-"));
+    const notMale = vs.filter((v) => !MALE.test(v.name));
+    voice =
+      vs.find((v) => isF(v) && lang(v, /^en-IN/i)) ||       // an Indian-English female voice, if the device has one
+      vs.find((v) => isF(v) && lang(v, /^en-GB/i)) ||
+      vs.find((v) => isF(v)) ||
+      notMale.find((v) => lang(v, /^en-IN/i)) ||            // unnamed voices (e.g. Android) are usually female
+      notMale[0] || vs[0] || null;
   }
   if (canSpeak) {
     pickVoice();
