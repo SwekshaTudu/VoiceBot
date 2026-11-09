@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Talk to Sweksha</title>
+<meta name="description" content="A voice bot that answers interview questions the way I would. Tap the mic and ask.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%230e6b5c'/%3E%3Crect x='25' y='14' width='14' height='24' rx='7' fill='%23f4f1ea'/%3E%3Cpath d='M18 31a14 14 0 0 0 28 0M32 45v7' stroke='%23f4f1ea' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --paper: #f4f1ea;
+    --card: #fffdf8;
+    --ink: #1b1f1d;
+    --muted: #66706b;
+    --line: #dcd6c8;
+    --accent: #0e6b5c;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcebe6;
+    --warn: #a2401f;
+    --live: #c2452d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #111514;
+      --card: #1a201e;
+      --ink: #ece9e1;
+      --muted: #98a39d;
+      --line: #2c3532;
+      --accent: #5fc9b3;
+      --accent-ink: #0c1513;
+      --accent-soft: #1d2f2b;
+      --warn: #f0a184;
+      --live: #f07a62;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    max-width: 680px;
+    height: 100dvh;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px;
+  }
+
+  header { padding: 22px 0 12px; display: flex; align-items: flex-start; gap: 12px; }
+  .who { flex: 1; min-width: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 {
+    margin: 2px 0 4px;
+    font: 600 clamp(28px, 6vw, 38px)/1.1 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .tagline { margin: 0; color: var(--muted); font-size: 15px; }
+  .sound {
+    flex: none;
+    margin-top: 4px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sound[aria-pressed="false"] { color: var(--muted); }
+
+  .log {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 2px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+  .msg { max-width: 86%; padding: 11px 14px; border-radius: 16px; overflow-wrap: anywhere; }
+  .msg.bot { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 5px; }
+  .msg.note { align-self: center; max-width: 100%; background: none; color: var(--warn); font-size: 14px; text-align: center; padding: 4px 8px; }
+  .msg .replay {
+    display: inline-block; margin-top: 6px; padding: 0; border: 0; background: none;
+    color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .dots span { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+  .dots span:nth-child(2) { animation-delay: .2s; }
+  .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+  .chips p { flex-basis: 100%; margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .chip {
+    border: 1px solid var(--line); background: transparent; color: var(--ink);
+    border-radius: 999px; padding: 8px 13px; font: inherit; font-size: 14px; cursor: pointer; text-align: left;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .dock {
+    flex: none;
+    border-top: 1px solid var(--line);
+    padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .mic {
+    position: relative;
+    width: 84px; height: 84px; border-radius: 50%;
+    border: 0; background: var(--accent); color: var(--accent-ink);
+    cursor: pointer; display: grid; place-items: center;
+    transition: transform .15s ease, background .2s ease;
+  }
+  .mic:active { transform: scale(.96); }
+  .mic:disabled { opacity: .4; cursor: not-allowed; }
+  .mic svg { width: 34px; height: 34px; }
+  .mic .ico-stop, .mic .ico-wave { display: none; }
+  .mic::before, .mic::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid var(--live); opacity: 0; pointer-events: none;
+  }
+  body[data-state="listening"] .mic { background: var(--live); color: #fff; }
+  body[data-state="listening"] .mic::before { animation: ring 1.6s ease-out infinite; }
+  body[data-state="listening"] .mic::after { animation: ring 1.6s ease-out .8s infinite; }
+  body[data-state="listening"] .mic .ico-mic, body[data-state="speaking"] .mic .ico-mic { display: none; }
+  body[data-state="listening"] .mic .ico-stop { display: block; }
+  body[data-state="speaking"] .mic .ico-wave { display: block; }
+  body[data-state="thinking"] .mic { opacity: .55; }
+  @keyframes ring { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.7); opacity: 0; } }
+
+  .status { min-height: 1.5em; margin: 0; font-size: 14px; color: var(--muted); text-align: center; }
+  .status.heard { color: var(--ink); font-style: italic; }
+
+  form { display: flex; gap: 8px; width: 100%; }
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 12px; padding: 11px 14px; font: inherit; font-size: 16px;
+  }
+  input::placeholder { color: var(--muted); }
+  .send {
+    border: 1px solid var(--accent); background: transparent; color: var(--accent);
+    border-radius: 12px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .send:disabled { opacity: .45; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body data-state="idle">
+<div class="app">
+  <header>
+    <div class="who">
+      <div class="eyebrow">Voice bot</div>
+      <h1 id="title">Talk to Sweksha</h1>
+      <p class="tagline" id="tagline">Tap the mic and ask me what you'd ask in an interview.</p>
+    </div>
+    <button class="sound" id="sound" type="button" aria-pressed="true" title="Turn spoken answers on or off">🔊 Voice on</button>
+  </header>
+
+  <main class="log" id="log" aria-live="polite">
+    <div class="msg bot" id="hello">Hi! Tap the mic and ask me a question out loud. I'll answer the way I would in person. You can also type below, or start with one of these.</div>
+    <div class="chips" id="chips">
+      <button class="chip" type="button">What should we know about your life story?</button>
+      <button class="chip" type="button">What's your #1 superpower?</button>
+      <button class="chip" type="button">What are the top 3 areas you'd like to grow in?</button>
+      <button class="chip" type="button">What misconception do your coworkers have about you?</button>
+      <button class="chip" type="button">How do you push your boundaries and limits?</button>
+    </div>
+  </main>
+
+  <div class="dock">
+    <button class="mic" id="mic" type="button" aria-label="Start listening">
+      <svg class="ico-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/></svg>
+      <svg class="ico-stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+      <svg class="ico-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 10v4M9 6v12M13 8.5v7M17 5v14M21 10v4"/></svg>
+    </button>
+    <p class="status" id="status" role="status">Tap to speak</p>
+    <form id="form" autocomplete="off">
+      <input type="text" id="text" placeholder="…or type a question" aria-label="Type a question" maxlength="500" enterkeyhint="send">
+      <button class="send" id="send" type="submit">Ask</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const log = $("log"), mic = $("mic"), statusEl = $("status"), form = $("form"), input = $("text"), soundBtn = $("sound");
+
+  const history = [];          // { role, content } sent to the server
+  let state = "idle";          // idle | listening | thinking | speaking
+  let muted = false;
+  let speakToken = 0;
+
+  // ───────── UI helpers ─────────
+  const IDLE_HINT = () => (voiceMode === "none" ? "Type your question below" : "Tap to speak");
+  function setState(s, text, heard) {
+    state = s;
+    document.body.dataset.state = s;
+    statusEl.textContent = text ?? ({ idle: IDLE_HINT(), listening: "Listening…", thinking: "Thinking…", speaking: "Speaking… tap to stop" })[s];
+    statusEl.classList.toggle("heard", Boolean(heard));
+    mic.setAttribute("aria-label", { idle: "Start listening", listening: "Stop listening", thinking: "Thinking", speaking: "Stop speaking" }[s]);
+    mic.disabled = s === "thinking" || (s === "idle" && voiceMode === "none");
+    $("send").disabled = s === "thinking";
+  }
+  function addMsg(role, text) {
+    const el = document.createElement("div");
+    el.className = "msg " + role;
+    el.textContent = text;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  }
+  function note(text) { addMsg("note", text); }
+
+  // ───────── Speaking (browser text-to-speech) ─────────
+  const canSpeak = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+  let voice = null;
+  function pickVoice() {
+    const vs = speechSynthesis.getVoices().filter((v) => /^en([-_]|$)/i.test(v.lang));
+    const by = (re) => vs.find((v) => re.test(v.lang.replace("_", "-")));
+    voice = by(/^en-IN/i) || vs.find((v) => /Google UK English Male|Daniel/i.test(v.name)) || by(/^en-GB/i) || by(/^en-US/i) || vs[0] || null;
+  }
+  if (canSpeak) {
+    pickVoice();
+    speechSynthesis.addEventListener?.("voiceschanged", pickVoice);
+  } else {
+    soundBtn.hidden = true;
+  }
+  let unlocked = false;
+  function unlockSpeech() {           // iOS/Safari only allow speech that starts from a tap
+    if (unlocked || !canSpeak) return;
+    unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch {}
+  }
+  function stopSpeaking() {
+    speakToken++;
+    if (canSpeak) speechSynthesis.cancel();
+    if (state === "speaking") setState("idle");
+  }
+  function speak(text) {
+    if (!canSpeak || muted || !text) { setState("idle"); return; }
+    const token = ++speakToken;
+    speechSynthesis.cancel();
+    let parts;
+    try { parts = text.split(new RegExp("(?<=[.!?])\\s+")); } catch { parts = [text]; }
+    parts = parts.map((p) => p.trim()).filter(Boolean);
+    setState("speaking");
+    let i = 0;
+    const next = () => {
+      if (token !== speakToken) return;
+      if (i >= parts.length) { setState("idle"); return; }
+      const u = new SpeechSynthesisUtterance(parts[i++]);
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = "en-US"; }
+      u.rate = 1.03;
+      u.onend = next;
+      u.onerror = (e) => { if (e.error === "interrupted" || e.error === "canceled") return; next(); };
+      speechSynthesis.speak(u);
+    };
+    next();
+  }
+  // Safety net: some browsers never fire "end".
+  setInterval(() => {
+    if (state === "speaking" && canSpeak && !speechSynthesis.speaking && !speechSynthesis.pending) {
+      const t = speakToken;
+      setTimeout(() => { if (t === speakToken && state === "speaking" && !speechSynthesis.speaking) { speakToken++; setState("idle"); } }, 700);
+    }
+  }, 1500);
+
+  soundBtn.addEventListener("click", () => {
+    muted = !muted;
+    soundBtn.setAttribute("aria-pressed", String(!muted));
+    soundBtn.textContent = muted ? "🔇 Voice off" : "🔊 Voice on";
+    if (muted) stopSpeaking(); else unlockSpeech();
+  });
+
+  // ───────── Asking ─────────
+  async function ask(text) {
+    text = (text || "").trim();
+    if (!text || state === "thinking") return;
+    stopSpeaking();
+    $("chips")?.remove();
+    addMsg("user", text);
+    history.push({ role: "user", content: text });
+    setState("thinking");
+    const pending = addMsg("bot", "");
+    pending.innerHTML = '<span class="dots" aria-label="Thinking"><span></span><span></span><span></span></span>';
+
+    try {
+      const r = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history.slice(-12) }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.reply) throw new Error(data.message || "Something went wrong. Please ask again.");
+      history.push({ role: "assistant", content: data.reply });
+      pending.textContent = data.reply;
+      if (canSpeak) {
+        const again = document.createElement("button");
+        again.type = "button"; again.className = "replay"; again.textContent = "Play again";
+        again.addEventListener("click", () => { muted && soundBtn.click(); speak(data.reply); });
+        pending.appendChild(document.createElement("br"));
+        pending.appendChild(again);
+      }
+      log.scrollTop = log.scrollHeight;
+      speak(data.reply);
+    } catch (err) {
+      history.pop();
+      pending.remove();
+      note(navigator.onLine === false ? "You seem to be offline. Check your connection and ask again." : (err.message || "Something went wrong. Please ask again."));
+      setState("idle");
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    unlockSpeech();
+    const t = input.value;
+    input.value = "";
+    ask(t);
+  });
+  log.addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (chip) { unlockSpeech(); ask(chip.textContent); }
+  });
+
+  // ───────── Listening ─────────
+  // 1) the browser's built-in speech recognition (Chrome, Edge, Safari)
+  // 2) backup: record audio and transcribe on the server (Firefox and others)
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecord = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+  let voiceMode = SR ? "sr" : canRecord ? "rec" : "none";
+  const MIC_BLOCKED = "I can't hear you because the microphone is blocked. Allow microphone access for this page (the icon in the address bar), or type your question below.";
+
+  let recog = null;
+  function startSR() {
+    let finalText = "", interim = "", errCode = "";
+    try {
+      recog = new SR();
+      recog.lang = /^en/i.test(navigator.language || "") ? navigator.language : "en-US";
+      recog.interimResults = true;
+      recog.continuous = false;
+      recog.maxAlternatives = 1;
+    } catch { voiceMode = canRecord ? "rec" : "none"; return canRecord ? startRec() : setState("idle"); }
+
+    recog.onresult = (e) => {
+      interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t; else interim += t;
+      }
+      const heard = (finalText + " " + interim).trim();
+      if (heard) setState("listening", "“" + heard + "”", true);
+    };
+    recog.onerror = (e) => { errCode = e.error || "error"; };
+    recog.onend = () => {
+      recog = null;
+      const text = (finalText + " " + interim).trim();
+      if (text) return ask(text);
+      if (errCode === "not-allowed") { setState("idle"); return note(MIC_BLOCKED); }
+      if (["network", "service-not-allowed", "language-not-supported", "audio-capture"].includes(errCode) && canRecord) {
+        voiceMode = "rec";               // built-in recognition isn't working here; use the backup
+        return setState("idle", "Tap the mic once more — switching to backup voice input");
+      }
+      setState("idle", errCode && errCode !== "no-speech" && errCode !== "aborted" ? "Voice input failed — try again or type below" : "I didn't catch that — tap and try again");
+    };
+    try { recog.start(); setState("listening"); }
+    catch { recog = null; setState("idle"); }
+  }
+
+  let recorder = null, recStream = null, recTimer = null, vad = null;
+  async function startRec() {
+    try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { setState("idle"); return note(MIC_BLOCKED); }
+    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"].find((m) => MediaRecorder.isTypeSupported?.(m)) || "";
+    const chunks = [];
+    try { recorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : undefined); }
+    catch { recStream.getTracks().forEach((t) => t.stop()); voiceMode = "none"; return setState("idle"); }
+
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      clearTimeout(recTimer);
+      stopVad();
+      recStream.getTracks().forEach((t) => t.stop());
+      const type = recorder.mimeType || mime || "audio/webm";
+      recorder = null;
+      const blob = new Blob(chunks, { type });
+      if (blob.size < 1500) return setState("idle", "I didn't catch that — tap and try again");
+      setState("thinking", "Working out what you said…");
+      try {
+        const audio = await new Promise((ok, bad) => {
+          const fr = new FileReader();
+          fr.onload = () => ok(String(fr.result).split(",")[1] || "");
+          fr.onerror = bad;
+          fr.readAsDataURL(blob);
+        });
+        const r = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audio, mime: type }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 501) { voiceMode = "none"; }
+        if (!r.ok) throw new Error(data.message || "I couldn't process that recording. Please try again or type below.");
+        setState("idle");
+        if (data.text) ask(data.text); else setState("idle", "I didn't catch that — tap and try again");
+      } catch (err) {
+        setState("idle");
+        note(err.message);
+      }
+    };
+    recorder.start();
+    recTimer = setTimeout(stopListening, 30000);
+    startVad(recStream);
+    setState("listening", "Listening… tap when you're done");
+  }
+  // Stop automatically after the person has spoken and then paused.
+  function startVad(stream) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      let spoke = false, quietSince = 0;
+      const id = setInterval(() => {
+        an.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) { const d = (v - 128) / 128; sum += d * d; }
+        const rms = Math.sqrt(sum / buf.length);
+        const now = Date.now();
+        if (rms > 0.04) { spoke = true; quietSince = 0; }
+        else if (spoke) { quietSince = quietSince || now; if (now - quietSince > 1800) stopListening(); }
+      }, 100);
+      vad = { ctx, id };
+    } catch { vad = null; }
+  }
+  function stopVad() {
+    if (!vad) return;
+    clearInterval(vad.id);
+    try { vad.ctx.close(); } catch {}
+    vad = null;
+  }
+
+  function stopListening() {
+    if (recog) { try { recog.stop(); } catch {} }
+    if (recorder && recorder.state !== "inactive") { try { recorder.stop(); } catch {} }
+  }
+
+  mic.addEventListener("click", () => {
+    unlockSpeech();
+    if (state === "speaking") return stopSpeaking();
+    if (state === "listening") return stopListening();
+    if (state !== "idle") return;
+    if (voiceMode === "sr") startSR();
+    else if (voiceMode === "rec") startRec();
+  });
+
+  // ───────── Start-up ─────────
+  setState("idle");
+  if (voiceMode === "none") note("Voice input isn't supported in this browser. You can type your question, or open this page in Chrome for the full voice experience.");
+
+  fetch("/api/config").then((r) => r.json()).then((c) => {
+    if (c.name) { $("title").textContent = "Talk to " + c.name; document.title = "Talk to " + c.name; }
+    if (c.tagline) $("tagline").textContent = c.tagline;
+    if (c.ready === false) note("Setup isn't finished: no AI key is configured on the server yet.");
+    if (voiceMode === "rec" && c.voiceBackup === false) { voiceMode = "none"; setState("idle"); }
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
